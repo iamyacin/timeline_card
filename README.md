@@ -84,6 +84,8 @@ When multiple entities are configured, the card renders all tracks on the map an
 | Name                        | Type     | Default      | Description                                                                                                                                                             |
 |-----------------------------|----------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `entity`                    | string[] | **required** | One or more `device_tracker`/`person` entities to pull GPS history from.                                                                                                |
+| **Data source**             |          |              |                                                                                                                                                                         |
+| `history_source`            | string   | `"recorder"` | Where GPS history is read from: `recorder` (Home Assistant's built-in history, purged after the recorder retention period) or `gps_timeline` (the [GPS Timeline integration](https://github.com/konewka17/timeline_card_backend), which stores history permanently). See [GPS Timeline history source](#gps-timeline-history-source). |
 | **Reverse geocoding**       |          |              | see [Reverse Geocoding](#reverse-geocoding) below                                                                                                                       |
 | `places_entity`             | string[] | `[]`         | Optional `sensor` entity (or list) from Places integration used first for reverse geocoding. Lists must match `entity` order/count when provided.                       |
 | `osm_api_key`               | string   | `null`       | Optional OSM Nominatim email address (used as API key) for reverse geocoding fallback.                                                                                  |
@@ -152,6 +154,27 @@ Places v3 is a breaking change in the Places integration itself: attributes such
 - History from before the v3 upgrade keeps working: for those periods the card still reads the old attributes.
 - The main v3 sensor's state is not an address but the string built from your Places *display options*. The card only uses it when it reads as a name (e.g. with the `formatted_place` option); a raw field list such as `not_home, house, 13, Beatrixstraat` is ignored, and the stay is named from the `..._place_name` sensor or from reverse geocoding (`osm_api_key`) instead.
 - Places' `show_time` option appends `(since HH:MM)` to the state, or `(since MM/DD)` once it is over a day old. Both are stripped before the name is used, so stays are not labelled with the moment the sensor happened to change.
+
+## GPS Timeline history source
+
+By default the card reads history through Home Assistant's Recorder, which only keeps the configured retention period (10 days by default). The [GPS Timeline integration](https://github.com/konewka17/timeline_card_backend) archives GPS points from any tracker into a separate database that is never purged, and can serve that history to the card:
+
+```yaml
+type: custom:location-timeline-card
+entity:
+    - device_tracker.my_phone
+history_source: gps_timeline
+places_entity:
+    - sensor.places_my_phone
+```
+
+- Install **GPS Timeline** via HACS and add a config entry for each tracked entity. Select the same Places (and optionally activity) sensors there that you use in the card, so they are archived alongside the GPS points.
+- Add `history_source: gps_timeline` to the card. The card keeps using the same `entity` IDs; every history query (tracker, Places, place-name and activity sensors) is routed to the archive instead of the recorder.
+- Entities that are not tracked by GPS Timeline return no history, so make sure every entity in `entity` has a matching GPS Timeline entry.
+- Only history archived so far is available. Run the `gps_timeline.backfill` service after installing to import the history still present in the recorder.
+- For Places v3, select the `..._place_name` child sensor as the Places companion in the GPS Timeline entry, otherwise archived place names may be missing for v3 sensors.
+- If the integration is not installed, the card shows an error explaining that GPS Timeline is required for this option.
+- Set `history_source: recorder` (the default) to switch back at any time; the card then behaves exactly as before.
 
 ## Notes
 

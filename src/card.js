@@ -22,6 +22,7 @@ import {localize} from "./localize/localize.js";
 const DEFAULT_CONFIG = {
     entity: [],
     places_entity: [],
+    history_source: "recorder",
     osm_api_key: null,
     stay_radius_m: 75,
     min_stay_minutes: 10,
@@ -126,6 +127,9 @@ class TimelineCard extends HTMLElement {
         }
         if (!["metric", "imperial"].includes(this._config.distance_unit)) {
             throw new Error("distance_unit must be either 'metric' or 'imperial'");
+        }
+        if (!["recorder", "gps_timeline"].includes(this._config.history_source)) {
+            throw new Error("history_source must be either 'recorder' or 'gps_timeline'");
         }
         if (!["auto", "light", "dark"].includes(this._config.map_appearance)) {
             throw new Error("map_appearance must be one of 'auto', 'light', or 'dark'");

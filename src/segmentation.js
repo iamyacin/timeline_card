@@ -1,4 +1,13 @@
-import {endOfDay, haversineMeters, resolvePlaceNameEntity, startOfDay, toLatLon, toPoint} from "./utils.js";
+import {
+    endOfDay,
+    GPS_TIMELINE_UNAVAILABLE,
+    haversineMeters,
+    isUnknownCommandError,
+    resolvePlaceNameEntity,
+    startOfDay,
+    toLatLon,
+    toPoint,
+} from "./utils.js";
 import {resolveStaySegments} from "./reverse-geocoding.js";
 import {resolveActivities} from "./activity.js";
 
@@ -186,11 +195,13 @@ function collectZones(hass) {
         .filter((zone) => Number.isFinite(zone.lat) && Number.isFinite(zone.lon));
 }
 
-async function fetchEntityHistory(hass, entityId, date) {
+async function fetchEntityHistory(hass, entityId, date, historySource = "recorder") {
     if (!hass || !entityId) return [];
     const historyPadding = 6 * 60 * 60 * 1000;
     const message = {
-        type: "history/history_during_period",
+        type: historySource === "gps_timeline"
+            ? "gps_timeline/history_during_period"
+            : "history/history_during_period",
         start_time: new Date(startOfDay(date).getTime() - historyPadding).toISOString(),
         end_time: new Date(endOfDay(date).getTime() + historyPadding).toISOString(),
         entity_ids: [entityId],
@@ -199,7 +210,15 @@ async function fetchEntityHistory(hass, entityId, date) {
         significant_changes_only: false,
     };
 
-    const response = await callWS(hass, message);
+    let response;
+    try {
+        response = await callWS(hass, message);
+    } catch (error) {
+        if (historySource === "gps_timeline" && isUnknownCommandError(error)) {
+            throw new Error(GPS_TIMELINE_UNAVAILABLE);
+        }
+        throw error;
+    }
     const states = extractEntityStates(response, entityId);
     return clampHistoryToDay(states, date);
 }
@@ -267,11 +286,12 @@ function extractEntityStates(response, entityId) {
 export async function getSegmentedTracks(date, config, hass, onQueueUpdate) {
     const entityEntries = config.entity;
     const zones = collectZones(hass);
+    const historySource = config.history_source === "gps_timeline" ? "gps_timeline" : "recorder";
 
     return await Promise.all(
         entityEntries.map(async (entry) => {
             const entityId = entry.entity;
-            const rawStates = await fetchEntityHistory(hass, entityId, date);
+            const rawStates = await fetchEntityHistory(hass, entityId, date, historySource);
             const rawPoints = rawStates.map((state) => toPoint(state)).filter(Boolean).filter((p) => p.lat !== 0 || p.lon !== 0);
             const points = filterSpeedOutliers(rawPoints, config.max_reasonable_speed_kmh);
 
@@ -280,9 +300,9 @@ export async function getSegmentedTracks(date, config, hass, onQueueUpdate) {
             const placeNameEntityId = resolvePlaceNameEntity(hass, placeEntityId);
             const activityEntityId = entry.activity_entity || null;
             const [placeStates, placeNameStates, activityStates] = await Promise.all([
-                placeEntityId ? fetchEntityHistory(hass, placeEntityId, date) : [],
-                placeNameEntityId ? fetchEntityHistory(hass, placeNameEntityId, date) : [],
-                activityEntityId ? fetchEntityHistory(hass, activityEntityId, date) : [],
+                placeEntityId ? fetchEntityHistory(hass, placeEntityId, date, historySource) : [],
+                placeNameEntityId ? fetchEntityHistory(hass, placeNameEntityId, date, historySource) : [],
+                activityEntityId ? fetchEntityHistory(hass, activityEntityId, date, historySource) : [],
             ]);
 
             const baseSegments = segmentTimeline(points, config, zones);

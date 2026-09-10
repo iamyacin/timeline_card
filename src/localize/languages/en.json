@@ -29,6 +29,7 @@
     },
     "errors": {
       "history_api_unavailable": "History WebSocket API not available. Ensure the Recorder/History integration is enabled.",
+      "gps_timeline_unavailable": "GPS Timeline integration is not installed or enabled. Install it via HACS to use history_source: gps_timeline.",
       "unable_to_load_history": "Unable to load history"
     }
   }
