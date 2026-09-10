@@ -14,6 +14,23 @@ export function getConfigFormSchema() {
             {
                 type: "expandable",
                 name: "",
+                title: "History source",
+                flatten: true,
+                schema: [
+                    {
+                        name: "history_source",
+                        selector: {
+                            select: {
+                                options: ["recorder", "gps_timeline"],
+                                mode: "dropdown",
+                            },
+                        },
+                    },
+                ],
+            },
+            {
+                type: "expandable",
+                name: "",
                 title: "Reverse geocoding",
                 flatten: true,
                 schema: [

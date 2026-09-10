@@ -215,9 +215,20 @@ export function resolvePlaceNameEntity(hass, placeEntityId) {
     return hass.states?.[conventionId] ? conventionId : null;
 }
 
+export const GPS_TIMELINE_UNAVAILABLE = "gps_timeline_unavailable";
+
+export function isUnknownCommandError(err) {
+    if (!err) return false;
+    if (err.code === "unknown_command") return true;
+    return String(err.message || "").toLowerCase().includes("unknown command");
+}
+
 export function formatErrorMessage(err) {
     const message = err && err.message ? String(err.message) : "";
-    if (message.toLowerCase().includes("unknown command")) {
+    if (message === GPS_TIMELINE_UNAVAILABLE) {
+        return localize("utils.errors.gps_timeline_unavailable");
+    }
+    if (isUnknownCommandError(err)) {
         return localize("utils.errors.history_api_unavailable");
     }
     return message || localize("utils.errors.unable_to_load_history");
