@@ -80,6 +80,7 @@ export class TimelineLeafletMap {
         this._highlightedPath = [];
         this._highlightedStay = null;
         this._isTravelHighlightActive = false;
+        this._animateHighlightedPath = true;
 
         this.setDarkMode(false);
         requestAnimationFrame(() => this._leafletMap.invalidateSize());
@@ -216,7 +217,17 @@ export class TimelineLeafletMap {
         this._highlightedStay = null;
     }
 
-    setDaySegments(tracks = [], activeEntityIndex = 0, onTrackClick = null, colors = [], hideUnselected = false) {
+    setDaySegments(
+        tracks = [],
+        {
+            activeEntityIndex = 0,
+            onTrackClick = null,
+            colors = [],
+            hideUnselected = false,
+            animateHighlightedPath = true,
+        } = {},
+    ) {
+        this._animateHighlightedPath = Boolean(animateHighlightedPath);
         this._fullDayPaths = tracks
             .map((track, index) => {
                 const points = [];
@@ -273,6 +284,7 @@ export class TimelineLeafletMap {
                     weight: 7,
                     opacity: 1,
                     borderWeight: 10,
+                    animated: this._animateHighlightedPath,
                 },
             ];
             this._isTravelHighlightActive = true;
@@ -366,7 +378,7 @@ export class TimelineLeafletMap {
             if (!Array.isArray(path.points) || path.points.length < 2) return;
             const latLngs = path.points.map((point) => point.point);
 
-            if (path.isActive || path.entityIndex === undefined) {
+            if ((path.isActive || path.entityIndex === undefined)) {
                 this._mapLayers.push(
                     this._Leaflet.polyline(latLngs, {
                         color: `color-mix(in srgb, black 30%, ${path.color})`,
@@ -380,6 +392,7 @@ export class TimelineLeafletMap {
                 color: path.color,
                 opacity: path.opacity ?? 1,
                 weight: path.weight,
+                className: path.animated ? "timeline-marching-ants" : "",
             });
             line.on("click", () => {
                 if (!Number.isInteger(path.entityIndex) || !this._onTrackClick) return;

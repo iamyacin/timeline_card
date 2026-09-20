@@ -29,6 +29,7 @@ const DEFAULT_CONFIG = {
     max_reasonable_speed_kmh: 300,
     map_appearance: "auto",
     map_height_px: 200,
+    animate_highlighted_path: true,
     map_tile_url: null,
     map_attribution: null,
     distance_unit: "metric",
@@ -386,13 +387,13 @@ class TimelineCard extends HTMLElement {
             if (!this._config.hide_current_location) {
                 this._mapView._currentLocations = this._getCurrentEntityLocations();
             }
-            this._mapView.setDaySegments(
-                tracks,
-                this._activeEntityIndex,
-                (entityIndex) => this._setActiveEntityIndex(entityIndex),
-                this._config.colors,
-                this._config.hide_unselected_on_map,
-            );
+            this._mapView.setDaySegments(tracks, {
+                activeEntityIndex: this._activeEntityIndex,
+                onTrackClick: (entityIndex) => this._setActiveEntityIndex(entityIndex),
+                colors: this._config.colors,
+                hideUnselected: this._config.hide_unselected_on_map,
+                animateHighlightedPath: this._config.animate_highlighted_path,
+            });
             this._touchStart = null;
 
             this._updateMapFitButton();
