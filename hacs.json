@@ -1,11 +1,11 @@
 {
   "name": "Location Timeline Card",
   "description": "A custom location timeline card for Home Assistant",
-  "codeowners": ["@konewka17"],
+  "codeowners": ["@iamyacin"],
   "config_flow": false,
   "dependencies": [],
-  "documentation": "https://github.com/konewka17/timeline_card",
+  "documentation": "https://github.com/iamyacin/timeline_card",
   "domain": "location-timeline-card",
-  "issues": "https://github.com/konewka17/timeline_card/issues",
+  "issues": "https://github.com/iamyacin/timeline_card/issues",
   "filename": "timeline_card.js"
 }
