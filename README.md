@@ -98,15 +98,22 @@ When multiple entities are configured, the card renders all tracks on the map an
 | `distance_unit`             | string   | `"metric"`   | Distance unit for moving segments: `metric` (m, km) or `imperial` (ft, mi).                                                                                             |
 | `map_appearance`            | string   | `"auto"`     | Map appearance: `auto` (align with HA theme), `light`, or `dark`.                                                                                                       |
 | `map_height_px`             | number   | `200`        | Height of the map area in pixels.                                                                                                                                       |
+| `map_tile_url`              | string   | `null`       | Raster tile URL template for the fallback base map (see [Base map](#base-map)). Only used when vector tiles are unavailable.                                             |
+| `map_attribution`           | string   | `null`       | Attribution shown for a custom `map_tile_url`. Defaults to OpenStreetMap.                                                                                               |
 | `hide_current_location`     | boolean  | `false`      | Hide the current location when viewing today.                                                                                                                           |
 | `hide_unselected_on_map`    | boolean  | `false`      | Fully hide non-selected entities' tracks/markers on the map instead of dimming them. Only the selected entity is shown.                                                 |
 | `hide_moving`               | boolean  | `false`      | Hide moving rows and keep only stays.                                                                                                                                   |
 | `reverse_timeline_order`    | boolean  | `false`      | Show timeline items from latest to earliest within the selected day.                                                                                                     |
 | `collapse_timeline`         | boolean  | `false`      | Start with the timeline section collapsed on first render.                                                                                                              |
 | `timeline_use_entity_color` | boolean  | `false`      | Use the active entity track color for the timeline spine/dots/text instead of always using HA `--primary-color`.                                                        |
+| `animate_highlighted_path`  | boolean  | `true`       | Animate ("marching ants") the currently-highlighted move segment to show direction of travel.                                                                           |
 | `colors`                    | string[] | `[]`         | Optional list of per-entity track colors. When set, these colors are used in order (cycled if needed) instead of HA `--primary-color`/`--color-x` variables.            |
 | **Misc**                    |          |              |                                                                                                                                                                         |
 | `update_interval`           | number   | `300`        | How often to refresh the card (in seconds).                                                                                                                             |
+
+## Map interactions
+
+- Hovering a timeline entry (desktop) highlights the matching segment on the map. A highlighted **move** segment animates ("marching ants") to show direction of travel when `animate_highlighted_path` is enabled (default).
 
 ## Reverse Geocoding
 
@@ -175,6 +182,23 @@ places_entity:
 - For Places v3, select the `..._place_name` child sensor as the Places companion in the GPS Timeline entry, otherwise archived place names may be missing for v3 sensors.
 - If the integration is not installed, the card shows an error explaining that GPS Timeline is required for this option.
 - Set `history_source: recorder` (the default) to switch back at any time; the card then behaves exactly as before.
+
+## Base map
+
+The card draws the base map the same way Home Assistant's own map does since 2026.9: [Shortbread vector tiles](https://vector.openstreetmap.org/) from the OpenStreetMap Foundation, rendered with MapLibre GL. The style, glyphs and sprites are the ones Home Assistant serves at `/static/map/`, so nothing extra is downloaded from a third party and dark mode uses a real dark style instead of an inverted light one.
+
+The card falls back to raster tiles when those assets are missing (Home Assistant older than 2026.9) or when the browser has no WebGL2. That fallback is CARTO's raster service, which now watermarks tiles requested without an API key and is being retired. Two ways out on an older Home Assistant:
+
+```yaml
+# Your own free CARTO key (https://carto.com/basemaps/apikey)
+map_tile_url: https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=YOUR_KEY
+```
+
+```yaml
+# Or any other raster tile server
+map_tile_url: https://tile.example.org/{z}/{x}/{y}.png
+map_attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+```
 
 ## Notes
 
