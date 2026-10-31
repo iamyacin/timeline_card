@@ -1,8 +1,8 @@
 import Leaflet from "leaflet";
 import {maplibreGL} from "@maplibre/maplibre-gl-leaflet";
+import {setRTLTextPlugin} from "maplibre-gl";
 import {getTrackColor} from "./utils.js";
 
-const DEFAULT_ZOOM = 13;
 const MAP_MIN_ZOOM = 1;
 const MAP_MAX_ZOOM = 20;
 
@@ -39,6 +39,14 @@ async function loadMapStyle(url) {
     return style;
 }
 
+let rtlTextPluginRequested = false;
+
+function ensureRTLTextPlugin() {
+    if (rtlTextPluginRequested) return;
+    rtlTextPluginRequested = true;
+    setRTLTextPlugin(new URL("/static/map/mapbox-gl-rtl-text.js", location.href).href, true).catch(() => {});
+}
+
 export class TimelineLeafletMap {
     constructor(mapElement, homeZoneCenter = null, options = {}) {
         if (!mapElement?.isConnected) {
@@ -48,6 +56,7 @@ export class TimelineLeafletMap {
         this._Leaflet = Leaflet;
         this._mapElement = mapElement;
         this._homeZoneCenter = homeZoneCenter;
+        this._defaultZoom = options.defaultZoom;
         this._leafletMap = Leaflet.map(mapElement, {zoomControl: true, minZoom: MAP_MIN_ZOOM, maxZoom: MAP_MAX_ZOOM});
 
         this._rasterTileUrl = options.mapTileUrl || "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
@@ -64,6 +73,7 @@ export class TimelineLeafletMap {
         this._styleRequest = 0;
         this._appliedDarkMode = false;
         this._contextLost = false;
+        this._lastTokenRecovery = 0;
         this._fallbackTimeout = undefined;
         this._handleVisibilityChange = () => {
             if (this._contextLost) this._scheduleRasterFallback();
@@ -71,7 +81,7 @@ export class TimelineLeafletMap {
         // Deferred so the caller's setDarkMode() lands before the style is picked.
         Promise.resolve().then(() => this._setupBaseLayer());
 
-        if (this._homeZoneCenter) this._leafletMap.setView(this._homeZoneCenter, DEFAULT_ZOOM);
+        if (this._homeZoneCenter) this._leafletMap.setView(this._homeZoneCenter, this._defaultZoom);
 
         this._mapLayers = [];
         this._fullDayPaths = [];
@@ -117,6 +127,7 @@ export class TimelineLeafletMap {
                 this._refreshTilesToken(),
             ]);
             if (this._destroyed) return false;
+            ensureRTLTextPlugin();
             layer = maplibreGL({
                 style,
                 localIdeographFontFamily: "sans-serif",
@@ -146,9 +157,16 @@ export class TimelineLeafletMap {
             this._contextLost = false;
             clearTimeout(this._fallbackTimeout);
         });
+        glMap.on("error", (event) => {
+            const status = event.error?.status;
+            if (status !== undefined && status !== 403 && status !== 404) return;
+            if (Date.now() - this._lastTokenRecovery < 30000) return;
+            this._lastTokenRecovery = Date.now();
+            this._refreshTilesToken().then(() => this._applyStyle());
+        });
         document.addEventListener("visibilitychange", this._handleVisibilityChange);
         this._tokenInterval = setInterval(() => this._refreshTilesToken(), 20 * 60 * 1000);
-        this._lafletMap.on("unload", () => {
+        this._leafletMap.on("unload", () => {
             clearTimeout(this._fallbackTimeout);
             clearInterval(this._tokenInterval);
             document.removeEventListener("visibilitychange", this._handleVisibilityChange);
@@ -192,7 +210,11 @@ export class TimelineLeafletMap {
         this._darkMode = darkMode;
         this._mapElement?.classList.toggle("dark", darkMode);
         if (!this._vectorLayer || darkMode === this._appliedDarkMode) return;
+        this._applyStyle();
+    }
 
+    _applyStyle() {
+        const darkMode = this._darkMode;
         const request = ++this._styleRequest;
         loadMapStyle(VECTOR_STYLES[darkMode ? "dark" : "light"])
             .then((style) => {
@@ -310,7 +332,7 @@ export class TimelineLeafletMap {
             bounds = this._fullDayPath?.points?.map((point) => point.point) || [];
         }
         if (!bounds.length) {
-            if (this._homeZoneCenter) this._leafletMap.setView(this._homeZoneCenter, DEFAULT_ZOOM);
+            if (this._homeZoneCenter) this._leafletMap.setView(this._homeZoneCenter, this._defaultZoom);
             return;
         }
         const normalizedBounds = bounds
@@ -318,7 +340,7 @@ export class TimelineLeafletMap {
             .filter((point) => point && Number.isFinite(point.lat) && Number.isFinite(point.lng));
         if (!normalizedBounds.length) return;
         const paddedBounds = this._Leaflet.latLngBounds(normalizedBounds).pad(0.1);
-        this._leafletMap.fitBounds(paddedBounds, {maxZoom: 14});
+        this._leafletMap.fitBounds(paddedBounds, {maxZoom: this._defaultZoom});
     }
 
     _drawMapSegments(segments) {
